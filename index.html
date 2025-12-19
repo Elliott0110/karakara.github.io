@@ -141,6 +141,10 @@
           <input id="gallery-folder" class="input" placeholder="Optional Drive folder ID (overrides server default)" value="12Ksg3saeVQxY9uKL3i8eM3XqjdE-qsvm" />
           <button id="gallery-load" class="btn-small primary">Load</button>
         </div>
+        <div class="input-row" style="margin-top:8px">
+          <input id="drive-api-key" class="input" placeholder="Google API Key (optional — for client Drive API listing)" />
+          <button id="drive-load-api" class="btn-small">Load From Drive API</button>
+        </div>
         <div style="margin-top:8px">
           <div class="small muted">Client-only: paste Google Drive file links or IDs below (files must be shared "Anyone with the link can view").</div>
           <div class="small muted" style="margin-top:6px">Server-mode: the Drive folder <a href="https://drive.google.com/drive/folders/12Ksg3saeVQxY9uKL3i8eM3XqjdE-qsvm?usp=sharing" target="_blank" rel="noopener" style="color:var(--accent)">12Ksg3saeVQxY9uKL3i8eM3XqjdE-qsvm</a> is prefilled — run the gallery server and click "Load" to fetch images from that folder.</div>
@@ -233,6 +237,8 @@
       const serverInput = document.getElementById('gallery-server');
       const folderInput = document.getElementById('gallery-folder');
       const loadBtn = document.getElementById('gallery-load');
+      const apiKeyInput = document.getElementById('drive-api-key');
+      const driveLoadApiBtn = document.getElementById('drive-load-api');
 
       function normalizeServer(u){
         if(!u) return '';
@@ -309,8 +315,49 @@
         grid.innerHTML = '';
         const ep = makeEndpoint();
         try{
-          const res = await fetch(ep, {cache:'no-store'});
-          if(!res.ok) throw new Error('Server returned ' + res.status);
+          // If no server configured but an API key is provided, try client Drive API first
+          const server = normalizeServer(serverInput.value || '');
+          const apiKey = (apiKeyInput && apiKeyInput.value || '').trim();
+          const folder = (folderInput.value || '').trim();
+          if(!server && apiKey && folder){
+            try{
+              const driveItems = await fetchDriveFiles(apiKey, folder);
+              render(driveItems);
+              return;
+            }catch(apiErr){
+              console.warn('Drive API client fetch failed', apiErr);
+              // continue to try server endpoints/fallbacks
+            }
+          }
+
+          let res = await fetch(ep, {cache:'no-store'});
+
+          // If requested endpoint returned 404 and no explicit server was given,
+          // try the common local server fallback at http://localhost:3000
+          if(res && res.status === 404 && !(serverInput.value || '').trim()){
+            const fallbackServer = 'http://localhost:3000';
+            const folder = (folderInput.value || '').trim();
+            const localEp = fallbackServer + '/api/images' + (folder ? ('?folderId=' + encodeURIComponent(folder)) : '');
+            try{
+              const r2 = await fetch(localEp, {cache:'no-store'});
+              if(r2 && r2.ok){
+                const items = await r2.json();
+                // ensure proxied relative urls are absolute to fallbackServer
+                const fixed = (items || []).map(i=>({
+                  ...i,
+                  url: i.url && i.url.startsWith('/') ? (fallbackServer + i.url) : i.url,
+                  thumb: i.thumb && i.thumb.startsWith('/') ? (fallbackServer + i.thumb) : i.thumb
+                }));
+                render(fixed);
+                return;
+              }
+            }catch(e){
+              // ignore and fall through to error handling below
+              console.warn('Local fallback fetch failed', e);
+            }
+          }
+
+          if(!res.ok) throw new Error('Server returned ' + (res.status || 'network error'));
           const items = await res.json();
           render(items);
         }catch(err){
@@ -322,6 +369,27 @@
         }finally{
           status.style.display = 'none';
         }
+      }
+
+      // Fetch Drive files using the public Drive REST API and an API key.
+      // Returns array of {url,thumb,name}
+      async function fetchDriveFiles(apiKey, folderId){
+        if(!apiKey) throw new Error('API key required');
+        if(!folderId) throw new Error('Folder ID required');
+        const q = encodeURIComponent(`'${folderId}' in parents and mimeType contains 'image/' and trashed = false`);
+        const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,thumbnailLink)&pageSize=200&key=${encodeURIComponent(apiKey)}`;
+        const res = await fetch(url);
+        if(!res.ok) {
+          const txt = await res.text().catch(()=>null);
+          throw new Error(`Drive API error ${res.status} ${txt||''}`);
+        }
+        const data = await res.json();
+        const files = data.files || [];
+        return files.map(f=>({
+          url: `https://drive.google.com/uc?export=view&id=${f.id}`,
+          thumb: f.thumbnailLink || `https://drive.google.com/uc?export=view&id=${f.id}`,
+          name: f.name
+        }));
       }
 
       function render(items){
@@ -409,6 +477,39 @@
         e.preventDefault();
         loadGallery();
       });
+
+      // wire the "Load From Drive API" button to use the same loader
+      driveLoadApiBtn.addEventListener('click', (e)=>{
+        e.preventDefault();
+        // ensure server field is empty so loader will try API key first
+        serverInput.value = '';
+        loadGallery();
+      });
+
+      // Auto-load behavior: allow passing API key in URL as ?driveKey=API_KEY
+      // or ?apiKey=API_KEY. This enables automatic loading on GitHub Pages without clicking.
+      (function autoLoadFromUrl(){
+        try{
+          const params = new URLSearchParams(window.location.search);
+          const k = params.get('driveKey') || params.get('apiKey') || params.get('key');
+          if(k){
+            apiKeyInput.value = k;
+            // If folder param provided in URL, set it
+            const f = params.get('folderId') || params.get('folder');
+            if(f) folderInput.value = f;
+            // Automatically load using the API key
+            // Delay slightly to allow the rest of DOM handlers to initialize
+            setTimeout(()=>{
+              // Clear server input so client API is preferred
+              serverInput.value = '';
+              loadGallery();
+            }, 150);
+          } else {
+            // If no API key param, still attempt the normal automatic load (server/local)
+            // This is already done on DOMContentLoaded; nothing extra needed.
+          }
+        }catch(e){/* ignore */}
+      })();
 
       // Load on start using default (relative) endpoint. If you want to use server at localhost:3000,
       // type it into the Server URL field and press Load.
