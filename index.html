@@ -132,9 +132,62 @@
   </div>
 
   <script>
-    // Small helper (no external libs)
+    // Small UX helpers: reveal on scroll + smooth link behavior
     (function(){
-      // Future: add interactivity here
+      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // Reveal elements with IntersectionObserver, fall back to on-load for older browsers
+      function setupReveal(){
+        const items = document.querySelectorAll('.reveal');
+        if(!items.length) return;
+        if(prefersReduced){
+          items.forEach(el=>el.classList.add('visible'));
+          return;
+        }
+        if('IntersectionObserver' in window){
+          const obs = new IntersectionObserver((entries, o)=>{
+            entries.forEach(e => {
+              if(e.isIntersecting){
+                e.target.classList.add('visible');
+                o.unobserve(e.target);
+              }
+            });
+          },{threshold:0.12});
+          items.forEach(i=>obs.observe(i));
+        } else {
+          // fallback
+          window.addEventListener('load', ()=>items.forEach(i=>i.classList.add('visible')));
+        }
+      }
+
+      // Smooth-scroll for nav links (extra handling for older browsers)
+      function setupNav(){
+        document.querySelectorAll('a[href^="#"]').forEach(a=>{
+          a.addEventListener('click', (e)=>{
+            const href = a.getAttribute('href');
+            if(href && href.startsWith('#')){
+              const target = document.querySelector(href);
+              if(target){
+                e.preventDefault();
+                target.scrollIntoView({behavior:'smooth',block:'start'});
+                history.replaceState(null,'',href);
+              }
+            }
+          });
+        });
+      }
+
+      // tiny initial animation: add logo class after paint
+      function kickLogo(){
+        const logo = document.querySelector('.logo');
+        if(logo) requestAnimationFrame(()=>logo.classList.add('animated'));
+      }
+
+      document.addEventListener('DOMContentLoaded', ()=>{
+        setupReveal();
+        setupNav();
+        kickLogo();
+      });
     })();
   </script>
 </body>
