@@ -25,7 +25,13 @@
     .card:hover{transform:translateY(-6px) scale(1.01);box-shadow:0 8px 30px rgba(2,6,23,0.6)}
     h1{margin:0;font-size:32px}
     p.lead{color:var(--muted);margin:12px 0 0}
-    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:16px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:16px}
+    .input-row{display:flex;gap:8px;align-items:center;margin-top:8px}
+    .input-row .input{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    .btn-small{padding:8px 10px;border-radius:8px;background:rgba(255,255,255,0.03);border:none;color:var(--muted);cursor:pointer}
+    .btn-small.primary{background:var(--accent);color:#022426;font-weight:600}
+    .error{color:#ffb4b4;margin-top:8px}
+    .loading{color:var(--muted);margin-top:8px}
     .small{font-size:14px;color:var(--muted)}
     footer{width:100%;text-align:center;padding:20px 0;color:var(--muted);margin-top:28px}
     .muted{color:var(--muted)}
@@ -126,6 +132,31 @@
       <p class="small">Say hello — <a href="mailto:hello@example.com" style="color:var(--accent)">hello@example.com</a></p>
     </section>
 
+    <section id="gallery" style="margin-top:16px">
+      <h2 style="margin:0 0 8px">Gallery</h2>
+      <div class="card" id="gallery-card">
+        <p class="small">Images are loaded from a backend endpoint. Upload new images via the backend to have them appear here.</p>
+        <div class="input-row">
+          <input id="gallery-server" class="input" placeholder="Server URL (e.g. http://localhost:3000) — leave blank to use relative /api/images" />
+          <input id="gallery-folder" class="input" placeholder="Optional Drive folder ID (overrides server default)" value="12Ksg3saeVQxY9uKL3i8eM3XqjdE-qsvm" />
+          <button id="gallery-load" class="btn-small primary">Load</button>
+        </div>
+        <div style="margin-top:8px">
+          <div class="small muted">Client-only: paste Google Drive file links or IDs below (files must be shared "Anyone with the link can view").</div>
+          <div class="small muted" style="margin-top:6px">Server-mode: the Drive folder <a href="https://drive.google.com/drive/folders/12Ksg3saeVQxY9uKL3i8eM3XqjdE-qsvm?usp=sharing" target="_blank" rel="noopener" style="color:var(--accent)">12Ksg3saeVQxY9uKL3i8eM3XqjdE-qsvm</a> is prefilled — run the gallery server and click "Load" to fetch images from that folder.</div>
+          <textarea id="drive-links" placeholder="Paste Drive share links or file IDs, one per line" style="width:100%;margin-top:8px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;height:90px"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="drive-add" class="btn-small">Add Images</button>
+            <button id="drive-clear" class="btn-small">Clear</button>
+          </div>
+        </div>
+        <div id="gallery-status" class="loading" style="display:none">Loading images…</div>
+        <div id="gallery-error" class="error" style="display:none"></div>
+        <div id="gallery-grid" class="grid" style="margin-top:12px"></div>
+        <div id="gallery-empty" class="small muted" style="display:none;margin-top:8px">No images yet. Upload one using the backend.</div>
+      </div>
+    </section>
+
     <footer>
       <div class="small">© 2025 Elliott — Built with a tiny template.</div>
     </footer>
@@ -187,6 +218,203 @@
         setupReveal();
         setupNav();
         kickLogo();
+      });
+    })();
+  </script>
+
+  <script>
+    // Gallery client: fetch /api/images (JSON array of {url,thumb?}) and render grid.
+    // This supports supplying a Server URL (e.g. http://localhost:3000) and optional Drive folderId.
+    (function(){
+      const grid = document.getElementById('gallery-grid');
+      const empty = document.getElementById('gallery-empty');
+      const status = document.getElementById('gallery-status');
+      const errorEl = document.getElementById('gallery-error');
+      const serverInput = document.getElementById('gallery-server');
+      const folderInput = document.getElementById('gallery-folder');
+      const loadBtn = document.getElementById('gallery-load');
+
+      function normalizeServer(u){
+        if(!u) return '';
+        // remove trailing slash
+        return u.replace(/\/$/, '');
+      }
+
+      function makeEndpoint(){
+        const server = normalizeServer(serverInput.value || '');
+        const folder = (folderInput.value || '').trim();
+        let ep = server ? (server + '/api/images') : '/api/images';
+        if(folder){
+          // append folderId as query param
+          const sep = ep.includes('?') ? '&' : '?';
+          ep = ep + sep + 'folderId=' + encodeURIComponent(folder);
+        }
+        return ep;
+      }
+
+      function createCard(img){
+        const el = document.createElement('div');
+        el.className = 'card reveal';
+        el.style.cursor = 'pointer';
+        const thumb = document.createElement('img');
+        thumb.src = img.thumb || img.url;
+        thumb.alt = img.alt || img.name || 'Gallery image';
+        thumb.loading = 'lazy';
+        thumb.style.width = '100%';
+        thumb.style.height = 'auto';
+        thumb.style.borderRadius = '8px';
+        thumb.style.display = 'block';
+        el.appendChild(thumb);
+        el.addEventListener('click', ()=>openLightbox(img));
+        return el;
+      }
+
+      function openLightbox(img){
+        let overlay = document.getElementById('lightbox-overlay');
+        if(!overlay){
+          overlay = document.createElement('div');
+          overlay.id = 'lightbox-overlay';
+          overlay.style.position = 'fixed';
+          overlay.style.left = 0; overlay.style.top = 0; overlay.style.right = 0; overlay.style.bottom = 0;
+          overlay.style.background = 'rgba(2,6,23,0.9)';
+          overlay.style.display = 'flex';
+          overlay.style.alignItems = 'center';
+          overlay.style.justifyContent = 'center';
+          overlay.style.padding = '20px';
+          overlay.style.zIndex = 9999;
+          overlay.addEventListener('click', ()=>overlay.remove());
+          const imgEl = document.createElement('img');
+          imgEl.id = 'lightbox-img';
+          imgEl.style.maxWidth = '92%';
+          imgEl.style.maxHeight = '92%';
+          imgEl.style.borderRadius = '10px';
+          imgEl.style.boxShadow = '0 12px 40px rgba(2,6,23,0.8)';
+          overlay.appendChild(imgEl);
+          document.body.appendChild(overlay);
+        }
+        const imgEl = document.getElementById('lightbox-img');
+        // if server returned proxied url like /api/image/:id and user provided server URL, make absolute
+        const server = normalizeServer(serverInput.value || '');
+        if(server && img.url && img.url.startsWith('/')){
+          imgEl.src = server + img.url;
+        } else {
+          imgEl.src = img.url;
+        }
+      }
+
+      async function loadGallery(){
+        errorEl.style.display = 'none';
+        status.style.display = 'block';
+        status.textContent = 'Loading images…';
+        grid.innerHTML = '';
+        const ep = makeEndpoint();
+        try{
+          const res = await fetch(ep, {cache:'no-store'});
+          if(!res.ok) throw new Error('Server returned ' + res.status);
+          const items = await res.json();
+          render(items);
+        }catch(err){
+          console.error('Gallery load error', err);
+          errorEl.style.display = 'block';
+          errorEl.textContent = 'Failed to load images: ' + err.message;
+          // try fallback images if present
+          render(FALLBACK_IMAGES);
+        }finally{
+          status.style.display = 'none';
+        }
+      }
+
+      function render(items){
+        grid.innerHTML = '';
+        if(!items || !items.length){
+          empty.style.display = 'block';
+          return;
+        }
+        empty.style.display = 'none';
+        items.forEach(img=>{
+          const card = createCard(img);
+          grid.appendChild(card);
+          requestAnimationFrame(()=>card.classList.add('visible'));
+        });
+      }
+
+      const FALLBACK_IMAGES = [
+        {url:'https://via.placeholder.com/1200x800.png?text=Sample+1',thumb:'https://via.placeholder.com/600x400.png?text=Sample+1'},
+        {url:'https://via.placeholder.com/1200x800.png?text=Sample+2',thumb:'https://via.placeholder.com/600x400.png?text=Sample+2'},
+        {url:'https://via.placeholder.com/1200x800.png?text=Sample+3',thumb:'https://via.placeholder.com/600x400.png?text=Sample+3'}
+      ];
+
+      // --- Client-only Drive support (Option A) ---
+      const driveLinksTextarea = document.getElementById('drive-links');
+      const driveAddBtn = document.getElementById('drive-add');
+      const driveClearBtn = document.getElementById('drive-clear');
+
+      // Parse possible Drive file IDs from pasted text/URLs
+      function parseDriveIds(text){
+        const ids = [];
+        if(!text) return ids;
+        const parts = text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+        parts.forEach(p=>{
+          // patterns: /file/d/FILE_ID, id=FILE_ID, open?id=FILE_ID, direct file id
+          let m = p.match(/file\/d\/([a-zA-Z0-9_-]+)/);
+          if(m && m[1]){ ids.push(m[1]); return; }
+          m = p.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+          if(m && m[1]){ ids.push(m[1]); return; }
+          m = p.match(/open\?id=([a-zA-Z0-9_-]+)/);
+          if(m && m[1]){ ids.push(m[1]); return; }
+          // folder links (skip)
+          if(p.includes('/drive/folders/')) return;
+          // otherwise, if the whole line looks like an id
+          m = p.match(/^([a-zA-Z0-9_-]{10,})$/);
+          if(m && m[1]){ ids.push(m[1]); return; }
+        });
+        return Array.from(new Set(ids)); // unique
+      }
+
+      // Convert a Drive file id to a direct-view URL that works when file is shared publicly
+      function driveViewUrl(id){
+        return 'https://drive.google.com/uc?export=view&id=' + encodeURIComponent(id);
+      }
+
+      driveAddBtn.addEventListener('click', (e)=>{
+        e.preventDefault();
+        const text = driveLinksTextarea.value;
+        const ids = parseDriveIds(text);
+        if(!ids.length){
+          errorEl.style.display = 'block';
+          errorEl.textContent = 'No Drive file IDs found. Paste share URLs or IDs (one per line).';
+          return;
+        }
+        // build items and render them at the front
+        const items = ids.map(id=>({url: driveViewUrl(id), thumb: driveViewUrl(id), name: id}));
+        // prepend to grid
+        empty.style.display = 'none';
+        items.forEach(img=>{
+          const card = createCard(img);
+          grid.insertBefore(card, grid.firstChild);
+          requestAnimationFrame(()=>card.classList.add('visible'));
+        });
+        // clear error and textarea
+        errorEl.style.display = 'none';
+        driveLinksTextarea.value = '';
+      });
+
+      driveClearBtn.addEventListener('click', (e)=>{
+        e.preventDefault();
+        driveLinksTextarea.value = '';
+        errorEl.style.display = 'none';
+      });
+
+      loadBtn.addEventListener('click', (e)=>{
+        e.preventDefault();
+        loadGallery();
+      });
+
+      // Load on start using default (relative) endpoint. If you want to use server at localhost:3000,
+      // type it into the Server URL field and press Load.
+      document.addEventListener('DOMContentLoaded', ()=>{
+        // try load automatically once
+        loadGallery();
       });
     })();
   </script>
