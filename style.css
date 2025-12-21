@@ -1,10 +1,25 @@
 :root {
     --bg: #0f1724;
+    --panel: rgba(255,255,255,0.02);
+    --text: #e6eef6;
     --card: #0b1220;
     --accent: #6ee7b7;
     --accent-2: #60a5fa;
     --muted: #94a3b8;
+    --header-bg: rgba(11,18,30,0.6);
+    --header-bg-scrolled: rgba(11,18,30,0.85);
     --maxw: 900px;
+}
+
+/* Light theme overrides applied when `data-theme="light"` is set on <html> */
+[data-theme="light"]{
+    --bg: #f8fafc;
+    --panel: rgba(2,6,23,0.03);
+    --text: #071025;
+    --muted: #475569;
+    --accent: #0ea5a3;
+    --header-bg: rgba(255,255,255,0.6);
+    --header-bg-scrolled: rgba(255,255,255,0.85);
 }
 
 * { box-sizing: border-box }
@@ -33,6 +48,16 @@ header {
     justify-content: space-between;
     align-items: center;
     padding: 12px 0;
+    background: var(--header-bg);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: box-shadow .18s ease, background .18s ease;
+}
+
+/* scrolled state uses a variable so light/dark header colors follow theme */
+header.scrolled{
+    box-shadow: 0 8px 24px rgba(2,6,23,0.6);
+    background: var(--header-bg-scrolled);
 }
 
 .brand { display:flex; gap:12px; align-items:center }

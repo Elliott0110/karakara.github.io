@@ -7,37 +7,16 @@
   <meta name="description" content="Simple personal site placeholder for Karakara">
   <link rel="stylesheet" href="style.css">
   <style>
-    /* Theme variables */
-    :root{
-      --bg: #0f1724;
-      --panel: rgba(255,255,255,0.02);
-      --text: #e6eef6;
-      --muted: #94a3b8;
-      --accent: #6ee7b7;
-      --header-bg: rgba(11,18,30,0.6);
-    }
-    [data-theme="light"]{
-      --bg: #f8fafc;
-      --panel: rgba(2,6,23,0.03);
-      --text: #071025;
-      --muted: #475569;
-      --accent: #0ea5a3;
-      --header-bg: rgba(255,255,255,0.6);
-    }
+    /* Theme variables moved to style.css so all pages share the same theme */
     html,body{background:var(--bg);color:var(--text)}
     a{color:var(--accent)}
 
-    /* Make header stick to top while scrolling */
+    /* Keep header sticky; look and background now originate from style.css */
     header{
       position:sticky;
       top:0;
       z-index:60;
-      background:var(--header-bg);
-      backdrop-filter:blur(6px);
-      -webkit-backdrop-filter:blur(6px);
-      transition:box-shadow .18s ease, background .18s ease;
     }
-    header.scrolled{box-shadow:0 8px 24px rgba(2,6,23,0.6);background:rgba(11,18,30,0.85)}
     /* Keep header content readable when sticky on small screens */
     @media (max-width:700px){
       header{padding:8px 12px}
