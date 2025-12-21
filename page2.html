@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Page 2 — Karakara</title>
+  <meta name="description" content="Second page for Karakara site">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Theme variables for page2 */
+    :root{--bg:#0f1724;--panel:rgba(255,255,255,0.02);--text:#e6eef6;--muted:#94a3b8;--accent:#6ee7b7}
+    [data-theme="light"]{--bg:#f8fafc;--panel:rgba(2,6,23,0.03);--text:#071025;--muted:#475569;--accent:#0ea5a3}
+    html,body{background:var(--bg);color:var(--text)}
+    a{color:var(--accent)}
+    .images-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:12px}
+    .images-grid .item{background:var(--panel);padding:8px;border-radius:8px;text-align:center}
+    .images-grid img{width:100%;height:150px;object-fit:cover;border-radius:6px}
+    .meta{font-size:13px;color:var(--muted);margin-top:8px;word-break:break-word}
+    .note{color:var(--muted);font-size:13px;margin-top:8px}
+    .theme-toggle{border:0;background:transparent;color:var(--muted);cursor:pointer;padding:6px 8px;border-radius:8px}
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-weight:700">Karakara</div>
+      <nav>
+        <a href="index.html">Home</a>
+        <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" style="margin-left:12px">🌙</button>
+        <span class="color-palette" id="color-palette" title="Choose accent color">
+          <span class="swatch" data-color="#ef4444" style="background:#ef4444" aria-label="red"></span>
+          <span class="swatch" data-color="#3b82f6" style="background:#3b82f6" aria-label="blue"></span>
+          <span class="swatch" data-color="#10b981" style="background:#10b981" aria-label="green"></span>
+          <span class="swatch" data-color="#f59e0b" style="background:#f59e0b" aria-label="yellow"></span>
+          <span class="swatch" data-color="#8b5cf6" style="background:#8b5cf6" aria-label="purple"></span>
+          <span class="swatch" data-color="#ec4899" style="background:#ec4899" aria-label="pink"></span>
+        </span>
+      </nav>
+    </header>
+
+    <main class="card">
+      <h1 style="margin-top:0">Page 2</h1>
+      <p class="small">This page shows a grid of images from the Drive folder.</p>
+      <div class="note">Folder: <a href="https://drive.google.com/drive/folders/12Ksg3saeVQxY9uKL3i8eM3XqjdE-qsvm"
+          target="_blank" rel="noopener" style="color:var(--accent)">12Ksg3saeVQxY9uKL3i8eM3XqjdE-qsvm</a></div>
+      <div class="note">To auto-load images, append <code>?driveKey=YOUR_API_KEY</code> to this page URL (create an API
+        key and restrict it to your domain).</div>
+      <div class="controls">
+        <button id="reload"
+          style="padding:8px 12px;border-radius:8px;background:var(--accent);color:#022426;border:none;cursor:pointer">Reload</button>
+        <div id="status" class="note"></div>
+      </div>
+      <div id="images" class="images-grid" aria-live="polite"></div>
+      <p style="margin-top:16px"><a href="index.html">← Back to Home</a></p>
+    </main>
+    <footer style="margin-top:20px;color:var(--muted)">© 2025 Elliott</footer>
+  </div>
+  <script>
+    (function () {
+      const FOLDER_ID = '12Ksg3saeVQxY9uKL3i8eM3XqjdE-qsvm';
+      const status = document.getElementById('status');
+      const imagesEl = document.getElementById('images');
+      const reloadBtn = document.getElementById('reload');
+
+      function setStatus(msg) { status.textContent = msg || ''; }
+
+      async function fetchDriveFiles(apiKey, folderId) {
+        if (!apiKey) throw new Error('API key required');
+        const q = encodeURIComponent(`'${folderId}' in parents and mimeType contains 'image/' and trashed = false`);
+        const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,thumbnailLink)&pageSize=500&key=${encodeURIComponent(apiKey)}`;
+        const res = await fetch(url);
+        if (!res.ok) {
+          const txt = await res.text().catch(() => null);
+          throw new Error(`Drive API error ${res.status} ${txt || ''}`);
+        }
+        const data = await res.json();
+        return (data.files || []).map(f => ({ id: f.id, name: f.name, thumb: f.thumbnailLink || `https://drive.google.com/uc?export=view&id=${f.id}`, url: `https://drive.google.com/uc?export=view&id=${f.id}` }));
+      }
+
+      function renderFiles(list) {
+        imagesEl.innerHTML = '';
+        if (!list || !list.length) { imagesEl.innerHTML = '<div class="note">No images found.</div>'; return; }
+        list.forEach(item => {
+          const d = document.createElement('div'); d.className = 'item';
+          const img = document.createElement('img'); img.src = item.thumb; img.alt = item.name || '';
+          img.loading = 'lazy';
+          img.addEventListener('click', () => openLightbox(item));
+          const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = item.name || item.id;
+          d.appendChild(img); d.appendChild(meta);
+          imagesEl.appendChild(d);
+        });
+      }
+
+      function openLightbox(item) {
+        let overlay = document.getElementById('lightbox-overlay');
+        if (!overlay) {
+          overlay = document.createElement('div'); overlay.id = 'lightbox-overlay';
+          Object.assign(overlay.style, { position: 'fixed', left: 0, top: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(2,6,23,0.9)', padding: '20px', zIndex: 9999 });
+          overlay.addEventListener('click', () => overlay.remove());
+          const img = document.createElement('img'); img.id = 'lightbox-img'; Object.assign(img.style, { maxWidth: '92%', maxHeight: '92%', borderRadius: '8px' });
+          overlay.appendChild(img); document.body.appendChild(overlay);
+        }
+        const imgEl = document.getElementById('lightbox-img');
+        imgEl.src = item.url;
+      }
+
+      async function load() {
+        try {
+          setStatus('Checking for API key in URL...');
+          const params = new URLSearchParams(window.location.search);
+          const key = params.get('driveKey') || params.get('apiKey') || params.get('key');
+          if (!key) {
+            setStatus('No API key provided. Append ?driveKey=YOUR_KEY to URL to auto-load.');
+            return;
+          }
+          setStatus('Loading images from Drive...');
+          const files = await fetchDriveFiles(key, FOLDER_ID);
+          renderFiles(files);
+          setStatus(`Loaded ${files.length} images.`);
+        } catch (e) {
+          console.error(e);
+          setStatus('Error: ' + e.message);
+          imagesEl.innerHTML = '<div class="note">Failed to load images. Check API key, Drive folder sharing, and Drive API enabled.</div>';
+        }
+      }
+
+      reloadBtn.addEventListener('click', () => load());
+      // auto load on page open
+      document.addEventListener('DOMContentLoaded', () => { load(); });
+    })();
+  </script>
+  <script>
+    // Theme toggle for page2 (mirror index behavior)
+    (function(){
+      const key = 'site-theme';
+      const btn = document.getElementById('theme-toggle');
+      const palette = document.getElementById('color-palette');
+      const accentKey = 'site-accent';
+      const swatches = palette ? Array.from(palette.querySelectorAll('.swatch')) : [];
+      function applyTheme(t){
+        if(t === 'light') document.documentElement.setAttribute('data-theme','light');
+        else document.documentElement.removeAttribute('data-theme');
+        if(btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
+      }
+      function applyAccent(hex){ if(!hex) return; document.documentElement.style.setProperty('--accent', hex); swatches.forEach(s=>{ s.classList.toggle('selected', s.getAttribute('data-color') === hex); }); }
+      function init(){
+        let t = localStorage.getItem(key);
+        if(!t){ t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
+        applyTheme(t);
+        const savedAccent = localStorage.getItem(accentKey);
+        if(savedAccent) applyAccent(savedAccent);
+      }
+      if(btn){ btn.addEventListener('click', ()=>{ const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; const next = cur === 'light' ? 'dark' : 'light'; localStorage.setItem(key,next); applyTheme(next); }); }
+      if(palette){ palette.addEventListener('click', (e)=>{ const t = e.target.closest('.swatch'); if(!t) return; const color = t.getAttribute('data-color'); applyAccent(color); localStorage.setItem(accentKey,color); }); }
+      init();
+    })();
+  </script>
+</body>
+
+</html>
