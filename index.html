@@ -6,6 +6,51 @@
   <title>Karakara — Home</title>
   <meta name="description" content="Simple personal site placeholder for Karakara">
   <link rel="stylesheet" href="style.css">
+  <style>
+    /* Theme variables */
+    :root{
+      --bg: #0f1724;
+      --panel: rgba(255,255,255,0.02);
+      --text: #e6eef6;
+      --muted: #94a3b8;
+      --accent: #6ee7b7;
+      --header-bg: rgba(11,18,30,0.6);
+    }
+    [data-theme="light"]{
+      --bg: #f8fafc;
+      --panel: rgba(2,6,23,0.03);
+      --text: #071025;
+      --muted: #475569;
+      --accent: #0ea5a3;
+      --header-bg: rgba(255,255,255,0.6);
+    }
+    html,body{background:var(--bg);color:var(--text)}
+    a{color:var(--accent)}
+
+    /* Make header stick to top while scrolling */
+    header{
+      position:sticky;
+      top:0;
+      z-index:60;
+      background:var(--header-bg);
+      backdrop-filter:blur(6px);
+      -webkit-backdrop-filter:blur(6px);
+      transition:box-shadow .18s ease, background .18s ease;
+    }
+    header.scrolled{box-shadow:0 8px 24px rgba(2,6,23,0.6);background:rgba(11,18,30,0.85)}
+    /* Keep header content readable when sticky on small screens */
+    @media (max-width:700px){
+      header{padding:8px 12px}
+    }
+
+    /* theme toggle */
+    .theme-toggle{border:0;background:transparent;color:var(--muted);cursor:pointer;padding:6px 8px;border-radius:8px}
+    .theme-toggle:hover{color:var(--text);background:rgba(255,255,255,0.03)}
+    /* color swatches */
+    .color-palette{display:inline-flex;gap:6px;align-items:center;margin-left:8px}
+    .swatch{width:18px;height:18px;border-radius:6px;cursor:pointer;border:2px solid transparent;box-sizing:border-box}
+    .swatch.selected{outline:2px solid rgba(255,255,255,0.12);transform:scale(1.05)}
+  </style>
   <link rel="icon" href="data:;base64,iVBORw0KGgo=">
 </head>
 <body>
@@ -92,7 +137,7 @@
         </div>
       </div>
     </section>
-
+    
     <footer style="display:flex;justify-content:space-between;align-items:center;gap:12px">
       <div class="small">© 2025 Elliott — Built with a tiny template.</div>
       <div>
@@ -101,7 +146,8 @@
     </footer>
   </div>
 
-  <script> // Small UX helpers: reveal on scroll + smooth link behavior
+  <script>
+    // Small UX helpers: reveal on scroll + smooth link behavior
     (function(){
       const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -160,7 +206,8 @@
     })();
   </script>
 
-    <script>      // Theme toggle: persist in localStorage and respect prefers-color-scheme
+    <script>
+      // Theme toggle: persist in localStorage and respect prefers-color-scheme
       (function(){
         const key = 'site-theme';
         const btn = document.getElementById('theme-toggle');
@@ -210,8 +257,8 @@
       })();
     </script>
 
-  <script>// Add small shadow to header when page is scrolled
-    
+  <script>
+    // Add small shadow to header when page is scrolled
     (function(){
       const hdr = document.querySelector('header');
       if(!hdr) return;
